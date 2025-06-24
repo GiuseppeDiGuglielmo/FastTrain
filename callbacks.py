@@ -5,10 +5,7 @@ Created on 7 Apr 2017
 '''
 
 import json
-
-# loss per epoch
 from time import time
-
 from tensorflow.keras.callbacks import Callback, EarlyStopping, History, ModelCheckpoint, ReduceLROnPlateau, TensorBoard
 
 
@@ -23,7 +20,7 @@ class newline_callbacks_begin(Callback):
         import os
 
         lossfile = os.path.join(self.outputDir, 'losses.log')
-        print('\n***callbacks***\nsaving losses to ' + lossfile)
+        #print('\n***callbacks***\nsaving losses to ' + lossfile)
         self.loss.append(epoch_logs.get('loss'))
         self.val_loss.append(epoch_logs.get('val_loss'))
         f = open(lossfile, 'w')
@@ -44,7 +41,8 @@ class newline_callbacks_begin(Callback):
 
 class newline_callbacks_end(Callback):
     def on_epoch_end(self, epoch, epoch_logs={}):  # noqa: B006
-        print('\n***callbacks end***\n')
+        pass
+        #print('\n***callbacks end***\n')
 
 
 class Losstimer(Callback):
@@ -73,37 +71,37 @@ class all_callbacks:
         self.nl_begin = newline_callbacks_begin(outputDir)
         self.nl_end = newline_callbacks_end()
 
-        self.stopping = EarlyStopping(monitor='val_loss', patience=stop_patience, verbose=1, mode='min')
+        self.stopping = EarlyStopping(monitor='val_loss', patience=stop_patience, verbose=0, mode='min')
 
         self.reduce_lr = ReduceLROnPlateau(
             monitor='val_loss',
             factor=lr_factor,
             patience=lr_patience,
             mode='min',
-            verbose=1,
+            verbose=0,
             epsilon=lr_epsilon,
             cooldown=lr_cooldown,
             min_lr=lr_minimum,
         )
 
         self.modelbestcheck = ModelCheckpoint(
-            outputDir + "/KERAS_check_best_model.h5", monitor='val_loss', verbose=1, save_best_only=True
+            outputDir + "/KERAS_check_best_model.keras", monitor='val_loss', verbose=0, save_best_only=True
         )
 
         self.modelbestcheckweights = ModelCheckpoint(
             outputDir + "/KERAS_check_best_model.weights.h5",
             monitor='val_loss',
-            verbose=1,
+            verbose=0,
             save_best_only=True,
             save_weights_only=True,
         )
 
-        self.modelcheckperiod = ModelCheckpoint(outputDir + "/KERAS_check_model_epoch{epoch:02d}.h5", verbose=1)
+        self.modelcheckperiod = ModelCheckpoint(outputDir + "/KERAS_check_model_epoch{epoch:02d}.keras", verbose=0)
 
-        self.modelcheck = ModelCheckpoint(outputDir + "/KERAS_check_model_last.h5", verbose=1)
+        self.modelcheck = ModelCheckpoint(outputDir + "/KERAS_check_model_last.keras", verbose=0)
 
         self.modelcheckweights = ModelCheckpoint(
-            outputDir + "/KERAS_check_model_last.weights.h5", verbose=1, save_weights_only=True
+            outputDir + "/KERAS_check_model_last.weights.h5", verbose=0, save_weights_only=True
         )
 
         self.tb = TensorBoard(log_dir=outputDir + '/logs')

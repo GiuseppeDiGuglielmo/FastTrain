@@ -7,7 +7,19 @@ import time
 import logging
 import traceback
 from datetime import datetime
+
+# Suppress TensorFlow warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # 0=all, 1=info, 2=warning, 3=error
+import warnings
+warnings.filterwarnings('ignore', category=FutureWarning)
+warnings.filterwarnings('ignore', category=UserWarning)
+warnings.filterwarnings('ignore', message='You are saving your model as an HDF5 file*')
+
 import tensorflow as tf
+# Additional TensorFlow logging suppression
+tf.get_logger().setLevel('ERROR')
+tf.autograph.set_verbosity(0)
+
 import numpy as np
 
 from tensorflow.keras.utils import to_categorical
@@ -36,7 +48,7 @@ port = 8000
 
 app = FastAPI(title="FastTrain Server", description="FastAPI server for remote ML training")
 DATA_DIR = "uploaded_data"
-MODEL_PATH = "trained_model.h5"
+MODEL_PATH = "trained_model.keras"
 os.makedirs(DATA_DIR, exist_ok=True)
 
 training_status = {
@@ -126,7 +138,7 @@ def train_model():
                     training_status["current_epoch"] = epoch + 1
                     training_status["progress"] = int((epoch + 1) / training_status["total_epochs"] * 80) + 10
                     training_status["metrics"] = logs or {}
-                    logger.info(f"Epoch {epoch + 1}/{training_status['total_epochs']} - {logs}")
+                    #logger.info(f"Epoch {epoch + 1}/{training_status['total_epochs']} - {logs}")
             
             callbacks = all_callbacks(
                 stop_patience=1000,
@@ -150,6 +162,7 @@ def train_model():
                 validation_split=0.25,
                 shuffle=True,
                 callbacks=callbacks.callbacks,
+                verbose=0
             )
             
             # Evaluate model
@@ -160,7 +173,7 @@ def train_model():
             
         else:
             from tensorflow.keras.models import load_model
-            model = load_model('model_1/KERAS_check_best_model.h5')
+            model = load_model('model_1/KERAS_check_best_model.keras')
             logger.info("Loaded pre-trained model")
 
         # Save model
@@ -309,7 +322,7 @@ async def get_model():
         return FileResponse(
             MODEL_PATH, 
             media_type="application/octet-stream",
-            filename="trained_model.h5",
+            filename="trained_model.keras",
             headers={"Content-Length": str(file_size)}
         )
         

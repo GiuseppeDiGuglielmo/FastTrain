@@ -21,7 +21,7 @@ clean:
 	rm -f *.pyc
 	rm -rf __pycache__/
 	rm -f data.npy labels.npy
-	rm -f model_downloaded.h5 trained_model.h5
+	rm -f model_downloaded.keras trained_model.keras
 	rm -f server.log
 	rm -rf uploaded_data/
 	rm -rf model_1/

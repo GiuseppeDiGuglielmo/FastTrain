@@ -1,7 +1,5 @@
-data.npy
-labels.npy
-model_downloaded.h5
+*.npy
 __pycache__
-server.log
-trained_model.h5
+*.log
+*keras
 uploaded_data

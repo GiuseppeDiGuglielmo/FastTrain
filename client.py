@@ -91,9 +91,9 @@ try:
         error_msg = response.json()
         print(f"❌ Model download failed: {error_msg}")
     else:
-        with open("model_downloaded.h5", "wb") as f:
+        with open("model_downloaded.keras", "wb") as f:
             f.write(response.content)
-        print("✅ Model downloaded successfully as 'model_downloaded.h5'")
+        print("✅ Model downloaded successfully as 'model_downloaded.keras'")
         print(f"📁 Model file size: {len(response.content)} bytes")
         
 except requests.RequestException as e:
