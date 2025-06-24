@@ -13,7 +13,6 @@ python server.py
 # or
 make server
 
-
 # Run client (in another terminal)
 python client.py
 # or
