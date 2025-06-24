@@ -1,0 +1,7 @@
+data.npy
+labels.npy
+model_downloaded.h5
+__pycache__
+server.log
+trained_model.h5
+uploaded_data
