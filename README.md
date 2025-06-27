@@ -1,4 +1,4 @@
-# FastTrain
+# FastTrain 🚂
 
 <img src="demo.gif">
 
