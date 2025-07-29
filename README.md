@@ -1,7 +1,9 @@
 # FastTrain 🚂
 
-<img src="doc/client_server.png">
-<img src="doc/demo.gif">
+<p align="center">
+  <img src="doc/client_server.png" width="1024px">
+  <img src="doc/demo.gif" width="1024px">
+</p>
 
 ## Quick Start
 
