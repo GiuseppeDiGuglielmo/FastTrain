@@ -1,6 +1,6 @@
 # FastTrain 🚂
 
-When training a model on data collected from a device (`client`) that is too slow for efficient processing, you can offload the training to a more powerful `server` to accelerate the process. Here is **FastTrain** 🚂. While there are likely other libraries that support this more efficiently, this is a first proof of concept, where the `client` and `server` are connected over an Ethernet LAN (or even the Internet).
+When training a model on data collected from a device (`client`) that is too slow for efficient processing, you can offload the training to a more powerful `server` to accelerate the process. Here is **FastTrain** 🚂. While there are likely other libraries that support this decoupling more efficiently, this is a first proof of concept, where the `client` and `server` are connected over an Ethernet LAN (or even the Internet).
 
 The `client` and `server` could be any platforms/devices.
 
