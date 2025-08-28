@@ -10,7 +10,7 @@ help:
 
 server:
 	@echo "Starting FastTrain server on http://127.0.0.1:8000"
-	python server.py
+	LD_PRELOAD="$(CONDA_PREFIX)/lib/libgomp.so.1" python server.py
 
 client:
 	@echo "Running FastTrain client..."
