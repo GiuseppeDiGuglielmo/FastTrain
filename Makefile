@@ -11,6 +11,7 @@ help:
 server:
 	@echo "Starting FastTrain server on http://127.0.0.1:8000"
 	@stdbuf -oL -eL python server.py 2> >(grep -vE "\+ptx[0-9]+")
+	#LD_PRELOAD="$(CONDA_PREFIX)/lib/libgomp.so.1" python server.py
 
 client:
 	@echo "Running FastTrain client..."
