@@ -10,11 +10,11 @@ help:
 
 server:
 	@echo "Starting FastTrain server on http://127.0.0.1:8000"
-	python server.py
+	@stdbuf -oL -eL python server.py 2> >(grep -vE "\+ptx[0-9]+")
 
 client:
 	@echo "Running FastTrain client..."
-	python client.py
+	@python client.py
 
 clean:
 	@echo "Cleaning generated files..."
