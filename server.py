@@ -77,26 +77,29 @@ def reset_training_status():
         "total_epochs": 10,
         "metrics": {}
     })
+    logger.info("Training status has been reset to initial state.")
 
 def train_model():
-    """Enhanced training function with better error handling and progress tracking"""
+    """Train the model with error handling and progress tracking."""
     try:
         training_status["running"] = True
         training_status["start_time"] = datetime.now().isoformat()
         training_status["error"] = None
-        logger.info("Starting model training...")
-        
+        logger.info("Loading training data...")
+
         # Load and validate data
         data_path = os.path.join(DATA_DIR, "data.npy")
         labels_path = os.path.join(DATA_DIR, "labels.npy")
-        
+
         if not os.path.exists(data_path) or not os.path.exists(labels_path):
-            raise FileNotFoundError("Training data files not found")
-            
+            logger.error("Training data files not found.")
+            raise FileNotFoundError("Training data files not found.")
+
         data = np.load(data_path, allow_pickle=True)
         labels = np.load(labels_path, allow_pickle=True)
-        logger.info(f"Loaded data: {data.shape}, labels: {labels.shape}")
+        logger.info(f"Training data loaded successfully. Data shape: {data.shape}, Labels shape: {labels.shape}")
 
+        logger.info("Preprocessing training data...")
         # Data preprocessing
         le = LabelEncoder()
         labels = le.fit_transform(labels)
@@ -108,39 +111,40 @@ def train_model():
         scaler = StandardScaler()
         X_train_val = scaler.fit_transform(X_train_val)
         X_test = scaler.transform(X_test)
-        logger.info("Data preprocessing completed")
+        logger.info("Training data preprocessing completed.")
 
+        logger.info("Building and training the model...")
         # Model architecture
         model = Sequential()
-        model.add(Dense(64, input_shape=(16,), name='fc1', 
-                       kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
+        model.add(Dense(64, input_shape=(16,), name='fc1',
+                        kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
         model.add(Activation(activation='relu', name='relu1'))
-        model.add(Dense(32, name='fc2', kernel_initializer='lecun_uniform', 
-                       kernel_regularizer=l1(0.0001)))
+        model.add(Dense(32, name='fc2', kernel_initializer='lecun_uniform',
+                        kernel_regularizer=l1(0.0001)))
         model.add(Activation(activation='relu', name='relu2'))
-        model.add(Dense(32, name='fc3', kernel_initializer='lecun_uniform', 
-                       kernel_regularizer=l1(0.0001)))
+        model.add(Dense(32, name='fc3', kernel_initializer='lecun_uniform',
+                        kernel_regularizer=l1(0.0001)))
         model.add(Activation(activation='relu', name='relu3'))
-        model.add(Dense(5, name='output', kernel_initializer='lecun_uniform', 
-                       kernel_regularizer=l1(0.0001)))
+        model.add(Dense(5, name='output', kernel_initializer='lecun_uniform',
+                        kernel_regularizer=l1(0.0001)))
         model.add(Activation(activation='softmax', name='softmax'))
 
         training_status["progress"] = 10
-        
+
         # Training configuration
         train = True
         if train:
             adam = Adam(learning_rate=0.0001)
             model.compile(optimizer=adam, loss=['categorical_crossentropy'], metrics=['accuracy'])
-            
+
             # Custom callback for progress tracking
             class ProgressCallback(tf.keras.callbacks.Callback):
                 def on_epoch_end(self, epoch, logs=None):
                     training_status["current_epoch"] = epoch + 1
                     training_status["progress"] = int((epoch + 1) / training_status["total_epochs"] * 80) + 10
                     training_status["metrics"] = logs or {}
-                    #logger.info(f"Epoch {epoch + 1}/{training_status['total_epochs']} - {logs}")
-            
+                    logger.info(f"Epoch {epoch + 1}/{training_status['total_epochs']} completed. Metrics: {logs}")
+
             callbacks = all_callbacks(
                 stop_patience=1000,
                 lr_factor=0.5,
@@ -150,11 +154,10 @@ def train_model():
                 lr_minimum=0.0000001,
                 outputDir='model_1',
             )
-            
+
             # Add progress callback
             callbacks.callbacks.append(ProgressCallback())
-            
-            logger.info("Starting model training...")
+
             history = model.fit(
                 X_train_val,
                 y_train_val,
@@ -165,17 +168,17 @@ def train_model():
                 callbacks=callbacks.callbacks,
                 verbose=0
             )
-            
+
             # Evaluate model
             test_loss, test_accuracy = model.evaluate(X_test, y_test, verbose=0)
             training_status["metrics"]["test_loss"] = test_loss
             training_status["metrics"]["test_accuracy"] = test_accuracy
-            logger.info(f"Test accuracy: {test_accuracy:.4f}")
-            
+            logger.info(f"Model evaluation completed. Test accuracy: {test_accuracy:.4f}")
+
         else:
             from tensorflow.keras.models import load_model
             model = load_model('model_1/KERAS_check_best_model.keras')
-            logger.info("Loaded pre-trained model")
+            logger.info("Pre-trained model loaded successfully.")
 
         # Save model
         model.save(MODEL_PATH)
@@ -183,10 +186,10 @@ def train_model():
         training_status["running"] = False
         training_status["completed"] = True
         training_status["end_time"] = datetime.now().isoformat()
-        logger.info("Model training completed successfully")
-        
+        logger.info("Model training completed and model saved.")
+
     except Exception as e:
-        error_msg = f"Training failed: {str(e)}"
+        error_msg = f"Model training failed: {str(e)}"
         training_status["running"] = False
         training_status["completed"] = False
         training_status["error"] = error_msg
@@ -210,31 +213,32 @@ async def root():
 
 @app.post("/upload/")
 async def upload_data(data: UploadFile = File(...), labels: UploadFile = File(...)):
-    """Upload training data files with validation"""
+    """Upload training data files with validation."""
     try:
         logger.info(f"Uploading files: {data.filename}, {labels.filename}")
-        
+
         # Validate file extensions
         if not data.filename.endswith('.npy') or not labels.filename.endswith('.npy'):
-            raise HTTPException(status_code=400, detail="Files must be .npy format")
-        
+            logger.error("Uploaded files must be in .npy format.")
+            raise HTTPException(status_code=400, detail="Files must be .npy format.")
+
         # Save data file
         data_content = await data.read()
         with open(os.path.join(DATA_DIR, "data.npy"), "wb") as f:
             f.write(data_content)
-        
+
         # Save labels file
         labels_content = await labels.read()
         with open(os.path.join(DATA_DIR, "labels.npy"), "wb") as f:
             f.write(labels_content)
-        
+
         # Validate uploaded files
         try:
             data_array = np.load(os.path.join(DATA_DIR, "data.npy"), allow_pickle=True)
             labels_array = np.load(os.path.join(DATA_DIR, "labels.npy"), allow_pickle=True)
-            
-            logger.info(f"Data uploaded successfully - Data shape: {data_array.shape}, Labels shape: {labels_array.shape}")
-            
+
+            logger.info(f"Files uploaded and validated successfully. Data shape: {data_array.shape}, Labels shape: {labels_array.shape}")
+
             return {
                 "status": "uploaded",
                 "data_shape": data_array.shape,
@@ -243,48 +247,51 @@ async def upload_data(data: UploadFile = File(...), labels: UploadFile = File(..
                 "labels_size_mb": len(labels_content) / (1024 * 1024)
             }
         except Exception as e:
+            logger.error(f"Uploaded files are not valid numpy arrays: {str(e)}")
             raise HTTPException(status_code=400, detail=f"Invalid numpy files: {str(e)}")
-            
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Upload error: {str(e)}")
+        logger.error(f"Data upload failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 @app.post("/start_training/")
 async def start_training():
-    """Start model training with enhanced error handling"""
+    """Start model training with error handling."""
     try:
         if training_status["running"]:
+            logger.info("Training is already in progress.")
             return {"status": "already running", "current_epoch": training_status["current_epoch"]}
-        
+
         # Check if data files exist
         if not os.path.exists(os.path.join(DATA_DIR, "data.npy")) or not os.path.exists(os.path.join(DATA_DIR, "labels.npy")):
+            logger.error("No training data found. Please upload data first.")
             raise HTTPException(status_code=400, detail="No training data uploaded. Please upload data first.")
-        
+
         # Reset status and start training
         reset_training_status()
         training_thread = threading.Thread(target=train_model, daemon=True)
         training_thread.start()
-        
-        logger.info("Training started")
+        logger.info("Model training has started.")
+
         return {
             "status": "training started",
             "start_time": training_status["start_time"],
             "total_epochs": training_status["total_epochs"]
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error starting training: {str(e)}")
+        logger.error(f"Failed to start model training: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to start training: {str(e)}")
 
 @app.get("/status/")
 async def get_status():
-    """Get detailed training status"""
+    """Get detailed training status."""
     status_copy = training_status.copy()
-    
+
     # Calculate training duration if available
     if status_copy["start_time"]:
         start_time = datetime.fromisoformat(status_copy["start_time"])
@@ -294,48 +301,53 @@ async def get_status():
         else:
             duration = (datetime.now() - start_time).total_seconds()
         status_copy["duration_seconds"] = round(duration, 2)
-    
+
+    #logger.info("Training status requested.")
     return status_copy
 
 @app.post("/reset/")
 async def reset_status():
-    """Reset training status"""
+    """Reset training status."""
     reset_training_status()
-    logger.info("Training status reset")
-    return {"status": "reset", "message": "Training status has been reset"}
+    logger.info("Training status reset via API endpoint.")
+    return {"status": "reset", "message": "Training status has been reset."}
 
 @app.get("/get_model/")
 async def get_model():
-    """Download trained model with enhanced error handling"""
+    """Download trained model with error handling."""
     try:
         if not os.path.exists(MODEL_PATH):
             if training_status["running"]:
+                logger.info("Model requested but training is still in progress.")
                 raise HTTPException(status_code=425, detail="Training still in progress. Model not ready yet.")
             elif training_status["error"]:
+                logger.error(f"Model requested but training failed: {training_status['error']}")
                 raise HTTPException(status_code=500, detail=f"Training failed: {training_status['error']}")
             else:
+                logger.info("Model requested but not found. Training has not started.")
                 raise HTTPException(status_code=404, detail="Model not found. Please start training first.")
-        
+
         # Get file size for logging
         file_size = os.path.getsize(MODEL_PATH)
-        logger.info(f"Serving model file: {MODEL_PATH} ({file_size} bytes)")
-        
+        logger.info(f"Serving trained model file: {MODEL_PATH} ({file_size} bytes)")
+
         return FileResponse(
-            MODEL_PATH, 
+            MODEL_PATH,
             media_type="application/octet-stream",
             filename="trained_model.keras",
             headers={"Content-Length": str(file_size)}
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error serving model: {str(e)}")
+        logger.error(f"Failed to serve trained model: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to serve model: {str(e)}")
 
 @app.get("/health/")
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint."""
+    logger.info("Health check requested.")
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
@@ -347,11 +359,11 @@ async def health_check():
     }
 
 if __name__ == "__main__":
-    logger.info(f"Starting ML Training Server on {server}:{port}")
+    logger.info(f"Starting ML Training Server at {server}:{port}")
     uvicorn.run(
-        "server:app", 
-        host=server, 
+        "server:app",
+        host=server,
         port=port,
         reload=False,
-        log_level="info"
+        log_level="warning"
     )

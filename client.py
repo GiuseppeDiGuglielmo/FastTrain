@@ -16,51 +16,48 @@ server = "131.225.220.30"
 port = "8000"
 base_url = f"http://{server}:{port}"
 
-# Fetch data from OpenML
-logger.info("Fetching data from OpenML...")
+logger.info("Checking for local data files...")
 if not os.path.exists("data.npy") or not os.path.exists("labels.npy"):
     try:
+        logger.info("Downloading dataset from OpenML...")
         dataset = fetch_openml('hls4ml_lhc_jets_hlf', version=1, as_frame=False)
         X, y = dataset['data'], dataset['target']
         np.save("data.npy", X)
         np.save("labels.npy", y)
-        logger.info(f"Data downloaded and saved. Shape: {X.shape}, Labels: {len(np.unique(y))}")
+        logger.info(f"Dataset downloaded and saved locally. Data shape: {X.shape}, Number of classes: {len(np.unique(y))}")
     except Exception as e:
-        logger.error(f"Error fetching data: {e}")
+        logger.error(f"Failed to download dataset: {e}")
         exit(1)
 else:
-    logger.info("Data files already exist locally")
+    logger.info("Local data files found. Skipping download.")
 
-# Upload data to training server
-logger.info("Uploading data to training server...")
+logger.info("Uploading data files to the training server...")
 try:
     with open("data.npy", "rb") as data_file, open("labels.npy", "rb") as labels_file:
         response = requests.post(f"{base_url}/upload/", files={"data": data_file, "labels": labels_file})
         response.raise_for_status()
-        logger.info(f"Upload successful: {response.json()}")
+        logger.info(f"Data files uploaded successfully. Server response: {response.json()}")
 except requests.RequestException as e:
-    logger.error(f"Error uploading data: {e}")
+    logger.error(f"Failed to upload data files: {e}")
     exit(1)
 except Exception as e:
-    logger.error(f"Error reading local files: {e}")
+    logger.error(f"Failed to read local data files: {e}")
     exit(1)
 
-# Start training
-logger.info("Starting training...")
+logger.info("Requesting model training to start...")
 try:
     response = requests.post(f"{base_url}/start_training/")
     response.raise_for_status()
     result = response.json()
-    logger.info(f"Training started: {result}")
+    logger.info(f"Model training request sent. Server response: {result}")
     
     if result.get("status") == "already running":
-        logger.info("Training is already in progress")
+        logger.info("Model training is already in progress.")
 except requests.RequestException as e:
-    logger.error(f"Error starting training: {e}")
+    logger.error(f"Failed to start model training: {e}")
     exit(1)
 
-# Wait and check status with polling
-logger.info("Monitoring training status...")
+logger.info("Polling training status from server...")
 max_wait_time = 300  # 5 minutes timeout
 check_interval = 10  # Check every 10 seconds
 elapsed_time = 0
@@ -72,39 +69,37 @@ while elapsed_time < max_wait_time:
         status = response.json()
         
         if status.get("completed"):
-            logger.info("Training completed successfully!")
+            logger.info("Model training completed successfully.")
             break
         elif status.get("running"):
-            logger.info(f"Training in progress... (elapsed: {elapsed_time}s)")
+            logger.info(f"Model training in progress. Elapsed time: {elapsed_time} seconds.")
         else:
-            logger.info(f"Status: {status}")
+            logger.info(f"Training status: {status}")
             
         time.sleep(check_interval)
         elapsed_time += check_interval
         
     except requests.RequestException as e:
-        logger.error(f"Error checking status: {e}")
+        logger.error(f"Failed to retrieve training status: {e}")
         break
 else:
-    logger.info("Training timeout reached")
+    logger.info("Training status polling timed out after 5 minutes.")
 
-# Download model
-logger.info("Downloading trained model...")
+logger.info("Requesting trained model download from server...")
 try:
     response = requests.get(f"{base_url}/get_model/")
     response.raise_for_status()
     
     if response.headers.get('content-type') == 'application/json':
-        # Server returned JSON error instead of model file
         error_msg = response.json()
-        logger.error(f"Model download failed: {error_msg}")
+        logger.error(f"Failed to download trained model. Server response: {error_msg}")
     else:
         with open("model_downloaded.keras", "wb") as f:
             f.write(response.content)
-        logger.info("Model downloaded successfully as 'model_downloaded.keras'")
-        logger.info(f"Model file size: {len(response.content)} bytes")
+        logger.info("Trained model downloaded successfully as 'model_downloaded.keras'.")
+        logger.info(f"Downloaded model file size: {len(response.content)} bytes.")
         
 except requests.RequestException as e:
-    logger.error(f"Error downloading model: {e}")
+    logger.error(f"Failed to download trained model: {e}")
 except Exception as e:
-    logger.error(f"Error saving model file: {e}")
+    logger.error(f"Failed to save trained model file: {e}")
