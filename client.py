@@ -4,7 +4,8 @@ import numpy as np
 import time
 from sklearn.datasets import fetch_openml
 
-server = "127.0.0.1"
+#server = "127.0.0.1"
+server = "131.225.220.30"
 port = "8000"
 base_url = f"http://{server}:{port}"
 
