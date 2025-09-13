@@ -43,7 +43,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-server = "127.0.0.1"
+#server = "127.0.0.1"
+server = "131.225.220.30"
 port = 8000
 
 app = FastAPI(title="FastTrain Server", description="FastAPI server for remote ML training")
