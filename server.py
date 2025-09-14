@@ -26,8 +26,8 @@ from tensorflow.keras.utils import to_categorical
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Activation, BatchNormalization
+from tensorflow.keras.layers import Dense, Activation, BatchNormalization, Dropout, Input, Add
+from tensorflow.keras.models import Model, Sequential
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.regularizers import l1
 from callbacks import all_callbacks
@@ -79,6 +79,91 @@ def reset_training_status():
     })
     logger.info("Training status has been reset to initial state.")
 
+def build_model(input_dim, num_classes):
+    """Build the current simple model (baseline)."""
+    model = Sequential()
+    model.add(Dense(64,
+                    input_shape=(input_dim,),
+                    name='fc1',
+                    kernel_initializer='lecun_uniform',
+                    kernel_regularizer=l1(0.0001)))
+    model.add(Activation(
+                    activation='relu',
+                    name='relu1'))
+    model.add(Dense(32, name='fc2',
+                    kernel_initializer='lecun_uniform',
+                    kernel_regularizer=l1(0.0001)))
+    model.add(Activation(
+                    activation='relu',
+                    name='relu2'))
+    model.add(Dense(32,
+                    name='fc3',
+                    kernel_initializer='lecun_uniform',
+                    kernel_regularizer=l1(0.0001)))
+    model.add(Activation(
+                    activation='relu',
+                     name='relu3'))
+    model.add(Dense(num_classes, name='output',
+                    kernel_initializer='lecun_uniform',
+                    kernel_regularizer=l1(0.0001)))
+    model.add(Activation(
+                    activation='softmax',
+                    name='softmax'))
+    return model
+
+def build_complex_model(input_dim, num_classes):
+    """Build a more complex model to stress the GH200 GPU."""
+    inputs = Input(shape=(input_dim,))
+    x = Dense(512, kernel_initializer='he_normal', kernel_regularizer=l1(0.0001))(inputs)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.3)(x)
+
+    # Residual block 1
+    shortcut = x
+    x = Dense(512, kernel_initializer='he_normal', kernel_regularizer=l1(0.0001))(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.3)(x)
+    x = Add()([x, shortcut])
+
+    # Residual block 2
+    shortcut = x
+    x = Dense(256, kernel_initializer='he_normal', kernel_regularizer=l1(0.0001))(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.3)(x)
+    # Project shortcut to match x's shape if needed
+    shortcut_proj = Dense(256, kernel_initializer='he_normal', kernel_regularizer=l1(0.0001))(shortcut)
+    x = Add()([x, shortcut_proj])
+
+    # More dense layers
+    x = Dense(128, kernel_initializer='he_normal', kernel_regularizer=l1(0.0001))(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.3)(x)
+
+    x = Dense(64, kernel_initializer='he_normal', kernel_regularizer=l1(0.0001))(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Dropout(0.3)(x)
+
+    outputs = Dense(num_classes, activation='softmax')(x)
+    model = Model(inputs=inputs, outputs=outputs)
+    return model
+
+def build_wide_model(input_dim, num_classes):
+    """Build a wide model with many units per layer."""
+    model = Sequential()
+    model.add(Dense(1024, input_shape=(input_dim,), activation='relu', kernel_initializer='he_normal'))
+    model.add(BatchNormalization())
+    model.add(Dropout(0.5))
+    model.add(Dense(1024, activation='relu', kernel_initializer='he_normal'))
+    model.add(BatchNormalization())
+    model.add(Dropout(0.5))
+    model.add(Dense(num_classes, activation='softmax'))
+    return model
+
 def train_model():
     """Train the model with error handling and progress tracking."""
     try:
@@ -114,71 +199,50 @@ def train_model():
         logger.info("Training data preprocessing completed.")
 
         logger.info("Building and training the model...")
-        # Model architecture
-        model = Sequential()
-        model.add(Dense(64, input_shape=(16,), name='fc1',
-                        kernel_initializer='lecun_uniform', kernel_regularizer=l1(0.0001)))
-        model.add(Activation(activation='relu', name='relu1'))
-        model.add(Dense(32, name='fc2', kernel_initializer='lecun_uniform',
-                        kernel_regularizer=l1(0.0001)))
-        model.add(Activation(activation='relu', name='relu2'))
-        model.add(Dense(32, name='fc3', kernel_initializer='lecun_uniform',
-                        kernel_regularizer=l1(0.0001)))
-        model.add(Activation(activation='relu', name='relu3'))
-        model.add(Dense(5, name='output', kernel_initializer='lecun_uniform',
-                        kernel_regularizer=l1(0.0001)))
-        model.add(Activation(activation='softmax', name='softmax'))
+        # Choose model here:
+        #model = build_model(input_dim=16, num_classes=5)
+        model = build_complex_model(input_dim=16, num_classes=5)
+        #model = build_wide_model(input_dim=16, num_classes=5)
 
         training_status["progress"] = 10
 
-        # Training configuration
-        train = True
-        if train:
-            adam = Adam(learning_rate=0.0001)
-            model.compile(optimizer=adam, loss=['categorical_crossentropy'], metrics=['accuracy'])
+        adam = Adam(learning_rate=0.0001)
+        model.compile(optimizer=adam, loss=['categorical_crossentropy'], metrics=['accuracy'])
 
-            # Custom callback for progress tracking
-            class ProgressCallback(tf.keras.callbacks.Callback):
-                def on_epoch_end(self, epoch, logs=None):
-                    training_status["current_epoch"] = epoch + 1
-                    training_status["progress"] = int((epoch + 1) / training_status["total_epochs"] * 80) + 10
-                    training_status["metrics"] = logs or {}
-                    logger.info(f"Epoch {epoch + 1}/{training_status['total_epochs']} completed. Metrics: {logs}")
+        class ProgressCallback(tf.keras.callbacks.Callback):
+            def on_epoch_end(self, epoch, logs=None):
+                training_status["current_epoch"] = epoch + 1
+                training_status["progress"] = int((epoch + 1) / training_status["total_epochs"] * 80) + 10
+                training_status["metrics"] = logs or {}
+                logger.info(f"Epoch {epoch + 1}/{training_status['total_epochs']} completed. Metrics: {logs}")
 
-            callbacks = all_callbacks(
-                stop_patience=1000,
-                lr_factor=0.5,
-                lr_patience=10,
-                lr_epsilon=0.000001,
-                lr_cooldown=2,
-                lr_minimum=0.0000001,
-                outputDir='model_1',
-            )
+        callbacks = all_callbacks(
+            stop_patience=1000,
+            lr_factor=0.5,
+            lr_patience=10,
+            lr_epsilon=0.000001,
+            lr_cooldown=2,
+            lr_minimum=0.0000001,
+            outputDir='model_1',
+        )
+        callbacks.callbacks.append(ProgressCallback())
 
-            # Add progress callback
-            callbacks.callbacks.append(ProgressCallback())
+        history = model.fit(
+            X_train_val,
+            y_train_val,
+            batch_size=1024,
+            epochs=training_status["total_epochs"],
+            validation_split=0.25,
+            shuffle=True,
+            callbacks=callbacks.callbacks,
+            verbose=0
+        )
 
-            history = model.fit(
-                X_train_val,
-                y_train_val,
-                batch_size=1024,
-                epochs=training_status["total_epochs"],
-                validation_split=0.25,
-                shuffle=True,
-                callbacks=callbacks.callbacks,
-                verbose=0
-            )
-
-            # Evaluate model
-            test_loss, test_accuracy = model.evaluate(X_test, y_test, verbose=0)
-            training_status["metrics"]["test_loss"] = test_loss
-            training_status["metrics"]["test_accuracy"] = test_accuracy
-            logger.info(f"Model evaluation completed. Test accuracy: {test_accuracy:.4f}")
-
-        else:
-            from tensorflow.keras.models import load_model
-            model = load_model('model_1/KERAS_check_best_model.keras')
-            logger.info("Pre-trained model loaded successfully.")
+        # Evaluate model
+        test_loss, test_accuracy = model.evaluate(X_test, y_test, verbose=0)
+        training_status["metrics"]["test_loss"] = test_loss
+        training_status["metrics"]["test_accuracy"] = test_accuracy
+        logger.info(f"Model evaluation completed. Test accuracy: {test_accuracy:.4f}")
 
         # Save model
         model.save(MODEL_PATH)
