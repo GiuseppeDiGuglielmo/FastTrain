@@ -11,22 +11,25 @@ help:
 	@echo "  make client      - Run the client"
 	@echo "  make clean       - Clean generated files"
 	@echo "  make stop        - Stop running processes"
+.PHONY: help
 
 tunnel-to-server:
-	@ssh -N -g -L 8000:correlator3.fnal.gov:8000 gdg@correlator3.fnal.gov
+	@echo "INFO: Setting up SSH tunnel to $(SERVER):8000"
+	@ssh -N -g -L 8000:$(SERVER):8000 gdg@$(SERVER)
+.PHONY: tunnel-to-server
 
 server:
-	#LD_PRELOAD="$(CONDA_PREFIX)/lib/libgomp.so.1" python server.py --client ${CLIENT} --server ${SERVER}
-	@echo "Starting FastTrain server on http://127.0.0.1:8000"
+	@echo "INFO: Starting FastTrain server on $(SERVER):8000"
 	@stdbuf -oL -eL python server.py 2> >(grep -vE "\+ptx[0-9]+")
-	#LD_PRELOAD="$(CONDA_PREFIX)/lib/libgomp.so.1" python server.py
+.PHONY: server
 
 client:
-	@echo "Running FastTrain client..."
+	@echo "INFO: Starting FastTrain client on $(CLIENT)"
 	@python client.py
+.PHONY: client
 
 clean:
-	@echo "Cleaning generated files..."
+	@echo "INFO: Cleaning generated files..."
 	rm -f *.pyc
 	rm -rf __pycache__/
 	rm -f data.npy labels.npy
@@ -35,8 +38,10 @@ clean:
 	rm -rf uploaded_data/
 	rm -rf model_1/
 	@echo "Cleanup complete!"
+.PHONY: clean
 
 stop:
-	@echo "Stopping FastTrain processes..."
+	@echo "INFO: Stopping FastTrain processes..."
 	pkill -f "python server.py" || echo "No server processes found"
 	pkill -f "uvicorn server:app" || echo "No uvicorn processes found"
+.PHONY: stop
