@@ -4,6 +4,7 @@ import numpy as np
 import time
 import logging
 from sklearn.datasets import fetch_openml
+from tensorflow.keras.models import load_model
 
 logging.basicConfig(
     level=logging.INFO,
@@ -103,3 +104,37 @@ except requests.RequestException as e:
     logger.error(f"Failed to download trained model: {e}")
 except Exception as e:
     logger.error(f"Failed to save trained model file: {e}")
+
+# After downloading the model, run inference using the test set
+try:
+    logger.info("Loading the trained model for inference...")
+    model = load_model("model_downloaded.keras")
+    logger.info("Model loaded successfully.")
+
+    # Load data and labels
+    X = np.load("data.npy", allow_pickle=True)
+    y = np.load("labels.npy", allow_pickle=True)
+
+    # Preprocess labels and split data (same as server)
+    from sklearn.preprocessing import LabelEncoder, StandardScaler
+    from sklearn.model_selection import train_test_split
+    from tensorflow.keras.utils import to_categorical
+
+    le = LabelEncoder()
+    y_encoded = le.fit_transform(y)
+    y_categorical = to_categorical(y_encoded, num_classes=len(np.unique(y_encoded)))
+
+    X_train_val, X_test, y_train_val, y_test = train_test_split(
+        X, y_categorical, test_size=0.2, random_state=42
+    )
+
+    scaler = StandardScaler()
+    X_train_val = scaler.fit_transform(X_train_val)
+    X_test = scaler.transform(X_test)
+
+    logger.info("Running inference on the test set...")
+    test_loss, test_accuracy = model.evaluate(X_test, y_test, verbose=0)
+    logger.info(f"Inference completed. Test loss: {test_loss:.4f}, Test accuracy: {test_accuracy:.4f}")
+
+except Exception as e:
+    logger.error(f"Failed to run inference: {e}")
